@@ -1,56 +1,56 @@
-from flask import Flask, render_template, request, redirect, url_for
+from flask import Flask, render_template, request, redirect
 from flask_sqlalchemy import SQLAlchemy
+from datetime import datetime, timezone
 
-# Initialize Flask application
 app = Flask(__name__)
+# app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://postgres:password@localhost:5432/postgres'   # running locally
+# postgres_link = 'postgresql://{user}:{password}@{host}:{port}/{database}'
+# app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://postgres:password@db:5432/mydb'   # with docker-compose
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://postgres:password123@flaskdb.cl0cauik08nk.ap-south-1.rds.amazonaws.com::5432/mydb'
 
-# Configure SQLAlchemy settings to connect to the PostgreSQL database running in Docker
-app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://postgres:password@localhost:5432/postgres'
+# Initialize SQLAlchemy with app context
+db = SQLAlchemy()
+db.init_app(app)
 
-# Initialize SQLAlchemy instance with the Flask application
-db = SQLAlchemy(app)
+class Student(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    attendance = db.relationship('Attendance', backref='student', lazy=True)
 
-# Define a SQLAlchemy model representing the 'Data' table in the database
-class Data(db.Model):
-    # Define columns for the 'Data' table
-    id = db.Column(db.Integer, primary_key=True)  # Primary key column
-    name = db.Column(db.String(80))                # Name column of maximum length 80 characters
+class Attendance(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    date = db.Column(db.Date, nullable=False, default=lambda: datetime.now(timezone.utc))
+    status = db.Column(db.String(10), nullable=False)
+    student_id = db.Column(db.Integer, db.ForeignKey('student.id'), nullable=False)
 
-    # Representation method for the Data model
-    def __repr__(self):
-        return '<User %r>' % self.name
-
-# Function to create the database table based on the defined models
-def create_table():
-    # Use app context to access the application context for database operations
+# Create tables within app context
+def init_db():
     with app.app_context():
-        # Create all database tables defined in the application
         db.create_all()
 
-# Define a route for the root URL ('/') of the web application
-@app.route('/', methods=['GET', 'POST'])
+@app.route('/')
 def index():
-    # Check if the request method is POST (form submission)
-    if request.method == 'POST':
-        # Extract 'name' from the form submission
-        name = request.form['name']
-        # Create a new Data object with the extracted 'name'
-        new_data = Data(name=name)
-        # Add the new Data object to the session
-        db.session.add(new_data)
-        # Commit the session to persist the changes to the database
-        db.session.commit()
-        # Redirect the user to the index route (refreshes the page)
-        return redirect(url_for('index'))
-    else:
-        # If the request method is GET, query all data from the 'Data' table
-        data = Data.query.all()
-        # Render the index.html template with the queried data
-        return render_template('index.html', data=data)
+    students = Student.query.all()
+    return render_template('index.html', students=students)
 
-# Entry point to the application
+@app.route('/add', methods=['POST'])
+def add_student():
+    name = request.form['name']
+    new_student = Student(name=name)
+    db.session.add(new_student)
+    db.session.commit()
+    return redirect('/')
+
+@app.route('/attendance', methods=['POST'])
+def mark_attendance():
+    student_id = request.form['student_id']
+    status = request.form['status']
+    new_attendance = Attendance(student_id=student_id, status=status)
+    db.session.add(new_attendance)
+    db.session.commit()
+    return redirect('/')
+
 if __name__ == '__main__':
-    # Call create_table function to ensure database table exists
-    create_table()
-    # Run the Flask application on host '0.0.0.0' and enable debug mode
-    app.run(host='0.0.0.0', debug=True)
+    init_db()  # Initialize database tables before running the app
+    app.run(debug=True, host='0.0.0.0', port=8000)
