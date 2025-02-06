@@ -3,11 +3,13 @@ from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime, timezone
 
 app = Flask(__name__)
-# app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://postgres:password@localhost:5432/postgres'   # running locally
-# postgres_link = 'postgresql://{user}:{password}@{host}:{port}/{database}'
-# app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://postgres:password@db:5432/mydb'   # with docker-compose
+
+# Corrected database URI format
+app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql+psycopg2://postgres:password123@flaskdb.cl0cauik08nk.ap-south-1.rds.amazonaws.com:5432/mydb'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://postgres:password123@flaskdb.cl0cauik08nk.ap-south-1.rds.amazonaws.com::5432/mydb'
+
+# Debug print statement
+print("Database URI:", app.config['SQLALCHEMY_DATABASE_URI'])
 
 # Initialize SQLAlchemy with app context
 db = SQLAlchemy()
@@ -24,7 +26,7 @@ class Attendance(db.Model):
     status = db.Column(db.String(10), nullable=False)
     student_id = db.Column(db.Integer, db.ForeignKey('student.id'), nullable=False)
 
-# Create tables within app context
+# Function to initialize database tables
 def init_db():
     with app.app_context():
         db.create_all()
